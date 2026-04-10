@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Seguridad Rural</title>
-    
+    <title>Seguridad Rural | Monitoreo</title>
     <meta name="theme-color" content="#1a6b5e">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="manifest.json">
-    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
         * {
             margin: 0;
@@ -20,25 +16,298 @@
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
-            background: #e8e4d8;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, sans-serif;
+            background: #f4f2ef;
             overflow: hidden;
             height: 100vh;
         }
-        
+
+        /* Mapa principal */
         #map {
             width: 100%;
             height: 100%;
             position: relative;
+            z-index: 1;
         }
-        
+
         .leaflet-control-attribution {
             display: none !important;
         }
 
-        /* Pin fijo en el centro para selección */
+        /* --- Estilo minimalista para el panel de reportes (centrado y más amplio) --- */
+        .reports-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 520px;
+            height: auto;
+            max-height: 80vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.03);
+            z-index: 1500;
+            overflow: hidden;
+            display: none;
+            flex-direction: column;
+            animation: panelFloat 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+        }
+
+        @keyframes panelFloat {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -48%) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .reports-header {
+            background: #1e2f2c;
+            padding: 20px 24px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: -0.2px;
+        }
+
+        .reports-header span i {
+            margin-right: 10px;
+            color: #7ee0b0;
+        }
+
+        .reports-header button {
+            background: rgba(255,255,255,0.12);
+            border: none;
+            color: white;
+            width: 34px;
+            height: 34px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: 0.2s;
+        }
+
+        .reports-header button:active {
+            background: rgba(255,255,255,0.3);
+            transform: scale(0.94);
+        }
+
+        .reports-list {
+            padding: 20px;
+            max-height: 65vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Estilo minimalista para cada caso */
+        .report-item {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid #edebe7;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .report-item:active {
+            transform: scale(0.99);
+        }
+
+        /* Cabecera del reporte (siempre visible) */
+        .report-header {
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+        }
+
+        .report-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-cat {
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 40px;
+            background: #eef2f0;
+            color: #1a5a4f;
+            letter-spacing: -0.2px;
+        }
+
+        .report-date {
+            font-size: 11px;
+            color: #8f9b96;
+            font-weight: 500;
+        }
+
+        .report-desc-preview {
+            font-size: 14px;
+            color: #2c3e2f;
+            font-weight: 450;
+            line-height: 1.3;
+            margin-top: 4px;
+            padding-right: 12px;
+        }
+
+        .expand-icon {
+            color: #9aa9a4;
+            font-size: 14px;
+            transition: transform 0.2s;
+            width: 28px;
+            text-align: center;
+        }
+
+        /* Detalle expandido (minimalista) */
+        .report-detail {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.28s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+            background: #fafaf8;
+            border-top: 1px solid #f0efea;
+            padding: 0 18px;
+        }
+
+        .report-detail.show {
+            max-height: 300px;
+            padding: 16px 18px 20px;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .detail-row i {
+            width: 20px;
+            color: #5d8275;
+            font-size: 13px;
+        }
+
+        .detail-text {
+            color: #2c423c;
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #36554b;
+            min-width: 70px;
+        }
+
+        .report-location {
+            font-family: monospace;
+            font-size: 12px;
+            background: #f1f1ec;
+            padding: 8px 10px;
+            border-radius: 18px;
+            margin-top: 6px;
+            color: #3a5a50;
+        }
+
+        /* Botones flotantes simplificados */
+        .fab-event {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            background: #2c7a5e;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.2);
+            cursor: pointer;
+            z-index: 900;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .fab-event:active {
+            transform: scale(0.94);
+            background: #1f5e48;
+        }
+
+        .fab-reports {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            width: 48px;
+            height: 48px;
+            background: rgba(30,30,30,0.85);
+            backdrop-filter: blur(12px);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 900;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .map-toggle {
+            position: fixed;
+            bottom: 24px;
+            left: 88px;
+            background: rgba(30,30,35,0.85);
+            backdrop-filter: blur(12px);
+            padding: 10px 18px;
+            border-radius: 40px;
+            z-index: 900;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .map-toggle span {
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .zoom-badge {
+            position: fixed;
+            bottom: 24px;
+            right: 100px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            padding: 5px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            color: white;
+            z-index: 900;
+            font-family: monospace;
+        }
+
+        /* Pin y selección minimal */
         .center-pin {
             position: absolute;
             top: 50%;
@@ -46,1320 +315,400 @@
             transform: translate(-50%, -100%);
             z-index: 1000;
             pointer-events: none;
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
-            transition: transform 0.15s ease;
+            filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
         }
-        
+
         .center-pin i {
             font-size: 42px;
-            color: #e74c3c;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            color: #e04e3c;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
 
-        .center-pin.pulse {
-            animation: pinPulse 0.3s ease;
-        }
-
-        @keyframes pinPulse {
-            0%, 100% { transform: translate(-50%, -100%) scale(1); }
-            50% { transform: translate(-50%, -100%) scale(1.15); }
-        }
-
-        /* Instrucción flotante */
-        .pin-instruction {
-            position: absolute;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.75);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-size: 14px;
-            backdrop-filter: blur(8px);
-            white-space: nowrap;
-            z-index: 1000;
-            pointer-events: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-
-        .pin-instruction i {
-            margin-right: 8px;
-            color: #e74c3c;
-        }
-
-        /* Panel de coordenadas */
-        .coord-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(8px);
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 13px;
-            font-family: monospace;
-            color: #2c3e50;
-            z-index: 1000;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            border: 1px solid rgba(0,0,0,0.1);
-            font-weight: 500;
-            pointer-events: none;
-        }
-
-        .coord-panel i {
-            color: #e74c3c;
-            margin-right: 6px;
-        }
-        
-        .fab-event {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 56px;
-            height: 56px;
-            background: #2ecc71;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-            cursor: pointer;
-            z-index: 900;
-            border: none;
-            transition: all 0.2s ease;
-            backdrop-filter: blur(4px);
-        }
-        
-        .fab-event:active {
-            transform: scale(0.98);
-        }
-        
-        .fab-reports {
-            position: fixed;
-            bottom: 24px;
-            left: 24px;
-            width: 48px;
-            height: 48px;
-            background: rgba(30,30,35,0.85);
-            backdrop-filter: blur(8px);
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            cursor: pointer;
-            z-index: 900;
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: all 0.2s ease;
-        }
-        
-        .fab-reports:active {
-            transform: scale(0.95);
-        }
-        
-        .map-toggle {
-            position: fixed;
-            bottom: 24px;
-            left: 88px;
-            background: rgba(30,30,35,0.85);
-            backdrop-filter: blur(8px);
-            padding: 10px 16px;
-            border-radius: 40px;
-            z-index: 900;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid rgba(255,255,255,0.2);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .map-toggle span {
-            color: white;
-            font-size: 13px;
-            font-weight: 500;
-            letter-spacing: 0.3px;
-        }
-        
-        .map-toggle i {
-            color: #2ecc71;
-            font-size: 14px;
-        }
-        
-        .map-toggle:active {
-            transform: scale(0.96);
-        }
-        
-        .zoom-badge {
-            position: fixed;
-            bottom: 24px;
-            right: 96px;
-            background: rgba(0,0,0,0.55);
-            backdrop-filter: blur(4px);
-            padding: 6px 12px;
-            border-radius: 30px;
-            font-size: 12px;
-            font-weight: 500;
-            font-family: monospace;
-            color: white;
-            z-index: 900;
-            letter-spacing: 0.5px;
-        }
-        
-        .layers-badge {
-            position: fixed;
-            top: 16px;
-            right: 16px;
-            background: rgba(0,0,0,0.45);
-            backdrop-filter: blur(4px);
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 500;
-            color: #ddd;
-            z-index: 900;
-            font-family: monospace;
-        }
-        
-        .connection-badge {
-            position: fixed;
-            top: 16px;
-            left: 16px;
-            background: rgba(0,0,0,0.55);
-            backdrop-filter: blur(4px);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 500;
-            color: white;
-            z-index: 900;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .connection-badge.online {
-            background: rgba(39, 174, 96, 0.85);
-        }
-        
-        .connection-badge.offline {
-            background: rgba(231, 76, 60, 0.85);
-        }
-        
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(8px);
-            z-index: 2000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .modal-card {
-            background: #ffffff;
-            border-radius: 28px;
-            width: 100%;
-            max-width: 380px;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            animation: fadeUp 0.25s ease;
-        }
-        
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .modal-header {
-            background: #1a6b5e;
-            padding: 20px 20px 16px;
-            border-radius: 28px 28px 0 0;
-            position: relative;
-        }
-        
-        .modal-header h3 {
-            color: white;
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-        }
-        
-        .modal-header p {
-            color: rgba(255,255,255,0.75);
-            font-size: 13px;
-            margin-top: 4px;
-        }
-        
-        .modal-close {
-            position: absolute;
-            top: 18px;
-            right: 20px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
-        .modal-body {
-            padding: 24px 20px 28px;
-        }
-        
-        .steps {
-            display: flex;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-        
-        .step {
-            width: 8px;
-            height: 8px;
-            background: #ddd;
-            border-radius: 10px;
-            transition: all 0.2s;
-        }
-        
-        .step.active {
-            width: 24px;
-            background: #2ecc71;
-        }
-        
-        .step-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: #1a2a2a;
-        }
-        
-        .step-desc {
-            font-size: 14px;
-            color: #7f8c8d;
-            margin-bottom: 24px;
-        }
-        
-        .location-options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin: 20px 0;
-        }
-        
-        .location-card {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 16px;
-            background: #f5f7f9;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid #eef2f5;
-        }
-        
-        .location-card:active {
-            background: #e8edf2;
-            transform: scale(0.98);
-        }
-        
-        .location-icon {
-            width: 44px;
-            height: 44px;
-            background: white;
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: #2ecc71;
-        }
-        
-        .location-text {
-            flex: 1;
-        }
-        
-        .location-title {
-            font-weight: 600;
-            font-size: 15px;
-            color: #1a2a2a;
-        }
-        
-        .location-desc {
-            font-size: 12px;
-            color: #95a5a6;
-            margin-top: 2px;
-        }
-        
-        .categories-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin: 20px 0;
-        }
-        
-        .cat-card {
-            background: #f5f7f9;
-            border-radius: 20px;
-            padding: 16px 8px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-            border: 1px solid #eef2f5;
-        }
-        
-        .cat-card:active {
-            transform: scale(0.97);
-            background: #e8edf2;
-        }
-        
-        .cat-card.active {
-            background: #e8f5e9;
-            border-color: #2ecc71;
-        }
-        
-        .cat-card i {
-            font-size: 24px;
-            color: #2ecc71;
-            margin-bottom: 8px;
-            display: block;
-        }
-        
-        .cat-card span {
-            font-size: 13px;
-            font-weight: 500;
-            color: #2c3e50;
-        }
-        
-        .form-field {
-            margin-bottom: 18px;
-        }
-        
-        .form-field label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: #4a5a6a;
-            margin-bottom: 6px;
-        }
-        
-        .form-field input, .form-field select, .form-field textarea {
-            width: 100%;
-            padding: 14px;
-            background: #f5f7f9;
-            border: 1px solid #e0e6ea;
-            border-radius: 16px;
-            font-size: 15px;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        
-        .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
-            outline: none;
-            border-color: #2ecc71;
-            background: white;
-        }
-        
-        .form-field textarea {
-            min-height: 90px;
-            resize: vertical;
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-        
-        .btn-primary {
-            flex: 1;
-            background: #2ecc71;
-            border: none;
-            padding: 14px;
-            border-radius: 40px;
-            color: white;
-            font-weight: 600;
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary:active {
-            transform: scale(0.97);
-            background: #27ae60;
-        }
-        
-        .btn-secondary {
-            flex: 1;
-            background: #ecf0f1;
-            border: none;
-            padding: 14px;
-            border-radius: 40px;
-            color: #5a6a7a;
-            font-weight: 500;
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-secondary:active {
-            transform: scale(0.97);
-            background: #dfe5e8;
-        }
-        
-        .reports-panel {
-            position: fixed;
-            top: 80px;
-            right: 16px;
-            width: 300px;
-            max-height: 70vh;
-            background: rgba(255,255,255,0.98);
-            backdrop-filter: blur(12px);
-            border-radius: 28px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            display: none;
-            z-index: 1000;
-            overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        .reports-header {
-            padding: 16px 20px;
-            background: #1a6b5e;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-weight: 600;
-        }
-        
-        .reports-list {
-            padding: 12px;
-            max-height: 55vh;
-            overflow-y: auto;
-        }
-        
-        .report-item {
-            background: #f8fafc;
-            border-radius: 20px;
-            padding: 14px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        
-        .report-item:active {
-            transform: scale(0.98);
-            background: #eef2f7;
-        }
-        
-        .report-cat {
-            display: inline-block;
-            padding: 4px 12px;
-            background: #2ecc71;
-            color: white;
-            border-radius: 20px;
-            font-size: 10px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        
-        .report-desc {
-            font-size: 13px;
-            color: #2c3e50;
-            margin-bottom: 6px;
-        }
-        
-        .report-date {
-            font-size: 10px;
-            color: #95a5a6;
-        }
-        
-        .loader-mini {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #e8e4d8;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 3000;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .loader-spinner-mini {
-            width: 32px;
-            height: 32px;
-            border: 3px solid #d0ccc0;
-            border-top-color: #2ecc71;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .toast-mini {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2c3e50;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-size: 13px;
-            z-index: 1500;
-            display: none;
-            white-space: nowrap;
-        }
-
-        /* Botón confirmar ubicación */
         .confirm-location-btn {
             position: absolute;
-            bottom: 160px;
+            bottom: 140px;
             left: 50%;
             transform: translateX(-50%);
-            background: #2ecc71;
+            background: #2c7a5e;
             color: white;
             border: none;
-            padding: 14px 28px;
-            border-radius: 40px;
-            font-size: 16px;
+            padding: 12px 24px;
+            border-radius: 60px;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+            font-size: 14px;
             cursor: pointer;
             z-index: 1000;
-            border: 2px solid white;
-            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
         }
 
-        .confirm-location-btn:active {
-            transform: translateX(-50%) scale(0.96);
-            background: #27ae60;
-        }
-
-        .confirm-location-btn i {
-            margin-right: 8px;
-        }
-
-        /* Botón cancelar selección */
         .cancel-selection-btn {
             position: absolute;
             top: 20px;
             right: 20px;
             width: 44px;
             height: 44px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.55);
             backdrop-filter: blur(8px);
+            border-radius: 50%;
             color: white;
             border: none;
-            border-radius: 50%;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .pin-instruction {
+            position: absolute;
+            bottom: 220px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            padding: 8px 18px;
+            border-radius: 40px;
+            color: white;
+            font-size: 13px;
+            white-space: nowrap;
+            z-index: 1000;
+        }
+
+        .coord-panel {
+            position: absolute;
+            bottom: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(12px);
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-family: monospace;
+            font-size: 12px;
+            color: white;
+            z-index: 1000;
+        }
+
+        /* Modal evento minimal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-card {
+            background: #ffffff;
+            border-radius: 36px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 30px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: #1f3e37;
+            padding: 22px 24px;
+            border-radius: 36px 36px 0 0;
+            color: white;
+        }
+
+        .modal-close {
+            float: right;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+
+        .step {
+            width: 8px;
+            height: 8px;
+            background: #ddd;
+            border-radius: 10px;
+            transition: 0.2s;
+        }
+
+        .step.active {
+            width: 24px;
+            background: #2c7a5e;
+        }
+
+        .location-card, .cat-card {
+            background: #f8f7f4;
+            border-radius: 24px;
+            padding: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+
+        .btn-primary {
+            background: #2c7a5e;
+            border: none;
+            padding: 14px;
+            border-radius: 60px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .btn-secondary {
+            background: #eef2ef;
+            border: none;
+            padding: 14px;
+            border-radius: 60px;
+            font-weight: 500;
+        }
+
+        .toast-mini {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e2a27;
+            color: white;
+            padding: 10px 22px;
+            border-radius: 60px;
+            font-size: 13px;
+            z-index: 2200;
+            display: none;
+        }
+
+        .loader-mini {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #f2efe8;
+            z-index: 3000;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            cursor: pointer;
-            z-index: 1000;
-            border: 1px solid rgba(255,255,255,0.3);
-            transition: all 0.2s ease;
-        }
-
-        .cancel-selection-btn:active {
-            transform: scale(0.92);
-            background: rgba(231, 76, 60, 0.8);
-        }
-        
-        @media (max-width: 500px) {
-            .fab-event { width: 52px; height: 52px; bottom: 20px; right: 20px; }
-            .fab-reports { width: 44px; height: 44px; bottom: 20px; left: 20px; }
-            .map-toggle { bottom: 20px; left: 78px; padding: 8px 14px; }
-            .zoom-badge { bottom: 22px; right: 86px; font-size: 11px; }
-            .reports-panel { width: 280px; right: 12px; }
-            .pin-instruction { bottom: 180px; font-size: 12px; }
-            .confirm-location-btn { bottom: 120px; padding: 12px 24px; font-size: 14px; }
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    
-    <!-- Pin fijo y controles de selección (sin overlay que bloquee) -->
-    <div class="center-pin" id="centerPin" style="display: none;">
-        <i class="fas fa-map-pin"></i>
+<div id="map"></div>
+
+<!-- Pin y selección -->
+<div class="center-pin" id="centerPin" style="display: none;"><i class="fas fa-map-pin"></i></div>
+<div class="pin-instruction" id="pinInstruction" style="display: none;"><i class="fas fa-hand-peace"></i> Mueve el mapa para ubicar</div>
+<div class="coord-panel" id="coordPanel" style="display: none;"><span id="coordDisplay"></span></div>
+<button class="confirm-location-btn" id="confirmSelectionBtn" style="display: none;"><i class="fas fa-check-circle"></i> Confirmar punto</button>
+<button class="cancel-selection-btn" id="cancelSelectionBtn" style="display: none;"><i class="fas fa-times"></i></button>
+
+<button class="fab-event" id="newEventBtn"><i class="fas fa-plus"></i></button>
+<button class="fab-reports" id="reportsBtn"><i class="fas fa-list-ul"></i></button>
+<div class="map-toggle" id="mapToggleBtn"><i class="fas fa-globe-americas"></i><span>Mapa base</span></div>
+<div class="zoom-badge" id="zoomBadge">🔍 12</div>
+
+<!-- PANEL DE REPORTES (centrado, más amplio, minimalista) -->
+<div class="reports-panel" id="reportsPanel">
+    <div class="reports-header">
+        <span><i class="fas fa-clock"></i> Incidentes recientes</span>
+        <button id="closeReportsBtn"><i class="fas fa-times"></i></button>
     </div>
-    <div class="pin-instruction" id="pinInstruction" style="display: none;">
-        <i class="fas fa-arrows-alt"></i> Mové el mapa para colocar el pin
+    <div class="reports-list" id="reportsListContainer">
+        <div style="text-align: center; padding: 30px; color: #9baca5;">Cargando reportes...</div>
     </div>
-    <div class="coord-panel" id="coordPanel" style="display: none;">
-        <i class="fas fa-map-pin"></i> <span id="coordDisplay">-35.576200, -58.010400</span>
-    </div>
-    <button class="confirm-location-btn" id="confirmSelectionBtn" style="display: none;">
-        <i class="fas fa-check"></i> Confirmar ubicación
-    </button>
-    <button class="cancel-selection-btn" id="cancelSelectionBtn" style="display: none;">
-        <i class="fas fa-times"></i>
-    </button>
-    
-    <button class="fab-event" id="newEventBtn"><i class="fas fa-plus"></i></button>
-    <button class="fab-reports" id="reportsBtn"><i class="fas fa-list-ul"></i></button>
-    
-    <div class="map-toggle" id="mapToggleBtn">
-        <i class="fas fa-map"></i>
-        <span>Mapa base</span>
-    </div>
-    
-    <div class="zoom-badge" id="zoomBadge">🔍 12</div>
-    <div class="layers-badge" id="layersBadge">📂 0/6</div>
-    <div class="connection-badge" id="connectionBadge"><i class="fas fa-wifi"></i> Online</div>
-    
-    <!-- Modal nuevo evento -->
-    <div class="modal-overlay" id="eventModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <button class="modal-close" id="closeModalBtn"><i class="fas fa-times"></i></button>
-                <h3>Registrar evento</h3>
-                <p>Completá los datos del suceso</p>
+</div>
+
+<!-- Modal nuevo evento -->
+<div class="modal-overlay" id="eventModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <button class="modal-close" id="closeModalBtn"><i class="fas fa-times"></i></button>
+            <h3>Registrar suceso</h3>
+            <p style="opacity:0.7; font-size:13px;">Datos del evento rural</p>
+        </div>
+        <div style="padding: 24px 22px 32px;">
+            <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 28px;">
+                <div class="step active" id="step1Dot"></div><div class="step" id="step2Dot"></div><div class="step" id="step3Dot"></div>
             </div>
-            <div class="modal-body">
-                <div class="steps">
-                    <div class="step active" id="step1Dot"></div>
-                    <div class="step" id="step2Dot"></div>
-                    <div class="step" id="step3Dot"></div>
+            <div id="step1Container">
+                <div style="font-weight: 600; margin-bottom: 6px;">📍 Ubicación exacta</div>
+                <div style="font-size:13px; color:#6f7e79; margin-bottom: 20px;">Seleccioná el punto en el mapa o usá tu GPS</div>
+                <div id="locationSelectedBox" style="display:none; background:#eef5f2; border-radius: 28px; padding: 16px; margin-bottom: 20px; text-align:center;">
+                    <i class="fas fa-check-circle" style="color:#2c7a5e; font-size: 24px;"></i>
+                    <div style="font-weight:500; margin:8px 0 4px;">Ubicación fijada</div>
+                    <div style="font-size:12px; font-family:monospace;" id="selectedCoordsText"></div>
+                    <button id="changeLocationBtn" style="background:#cbdcd5; border:none; border-radius:40px; padding:8px 16px; margin-top:12px;">Cambiar</button>
                 </div>
-                
-                <div id="step1Container">
-                    <div class="step-title">📍 Ubicación</div>
-                    <div class="step-desc">Seleccioná dónde ocurrió</div>
-                    
-                    <div id="locationSelectedBox" style="display: none;">
-                        <div style="background: #e8f5e9; border-radius: 20px; padding: 16px; text-align: center; margin-bottom: 20px;">
-                            <i class="fas fa-check-circle" style="color: #2ecc71; font-size: 28px;"></i>
-                            <div style="font-weight: 600; margin: 8px 0 4px;">Ubicación seleccionada</div>
-                            <div style="font-size: 12px; font-family: monospace;" id="selectedCoordsText"></div>
-                            <button class="change-location-btn" id="changeLocationBtn" style="background: #3498db; border: none; color: white; padding: 8px 16px; border-radius: 30px; margin-top: 10px; font-size: 12px;">Cambiar</button>
-                        </div>
-                        <div class="action-buttons">
-                            <button class="btn-secondary" id="cancelEventBtn">Cancelar</button>
-                            <button class="btn-primary" id="nextStep1Btn">Siguiente</button>
-                        </div>
-                    </div>
-                    
-                    <div id="locationSelectBox">
-                        <div class="location-options">
-                            <div class="location-card" id="useGpsBtn">
-                                <div class="location-icon"><i class="fas fa-location-dot"></i></div>
-                                <div class="location-text">
-                                    <div class="location-title">Mi ubicación actual</div>
-                                    <div class="location-desc">Usar GPS del dispositivo</div>
-                                </div>
-                                <i class="fas fa-chevron-right" style="color: #bbb;"></i>
-                            </div>
-                            <div class="location-card" id="selectOnMapBtn">
-                                <div class="location-icon"><i class="fas fa-map-pin"></i></div>
-                                <div class="location-text">
-                                    <div class="location-title">Seleccionar en el mapa</div>
-                                    <div class="location-desc">Movelo para colocar el pin</div>
-                                </div>
-                                <i class="fas fa-chevron-right" style="color: #bbb;"></i>
-                            </div>
-                        </div>
-                        <button class="btn-secondary" id="cancelEventBtn2" style="width: 100%;">Cancelar</button>
-                    </div>
+                <div id="locationSelectBox">
+                    <div class="location-card" id="useGpsBtn"><i class="fas fa-location-dot"></i> Mi ubicación actual</div>
+                    <div class="location-card" id="selectOnMapBtn"><i class="fas fa-map-pin"></i> Elegir en el mapa</div>
+                    <button class="btn-secondary" id="cancelEventBtn2" style="width:100%; margin-top:10px;">Cancelar</button>
                 </div>
-                
-                <div id="step2Container" style="display: none;">
-                    <div class="step-title">🏷️ Categoría</div>
-                    <div class="step-desc">¿Qué tipo de evento fue?</div>
-                    <div class="categories-grid" id="categoriesGrid"></div>
-                    <div class="action-buttons">
-                        <button class="btn-secondary" id="backStep1Btn">Atrás</button>
-                        <button class="btn-primary" id="nextStep2Btn" disabled>Siguiente</button>
-                    </div>
+                <div class="action-buttons" style="display: flex; gap:12px; margin-top:20px;">
+                    <button class="btn-secondary" id="cancelEventBtn" style="flex:1;">Cancelar</button>
+                    <button class="btn-primary" id="nextStep1Btn" style="flex:1;">Siguiente</button>
                 </div>
-                
-                <div id="step3Container" style="display: none;">
-                    <div class="step-title">📝 Detalles</div>
-                    <div class="step-desc">Completá la información</div>
-                    <div class="form-field">
-                        <label>Tipo específico</label>
-                        <select id="detailSelect"></select>
-                    </div>
-                    <div class="form-field">
-                        <label>Descripción</label>
-                        <textarea id="descriptionInput" placeholder="Contanos qué pasó..."></textarea>
-                    </div>
-                    <div class="form-field">
-                        <label>Fecha y hora</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="date" id="eventDateInput" style="flex:1;">
-                            <input type="time" id="eventTimeInput" style="flex:1;">
-                        </div>
-                    </div>
-                    <div class="action-buttons">
-                        <button class="btn-secondary" id="backStep2Btn">Atrás</button>
-                        <button class="btn-primary" id="saveEventBtn">Guardar evento</button>
-                    </div>
-                </div>
+            </div>
+            <div id="step2Container" style="display:none;">
+                <div style="font-weight: 600;">Categoría</div>
+                <div class="categories-grid" id="categoriesGrid" style="display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin: 20px 0;"></div>
+                <div style="display: flex; gap:12px;"><button class="btn-secondary" id="backStep1Btn" style="flex:1;">Atrás</button><button class="btn-primary" id="nextStep2Btn" disabled style="flex:1;">Continuar</button></div>
+            </div>
+            <div id="step3Container" style="display:none;">
+                <div style="font-weight: 600;">Detalles del evento</div>
+                <div class="form-field" style="margin: 16px 0;"><label>Tipo específico</label><select id="detailSelect" style="width:100%; padding:12px; border-radius:28px; background:#f5f4f0;"></select></div>
+                <div class="form-field"><label>Descripción breve</label><textarea id="descriptionInput" rows="2" style="width:100%; padding:12px; border-radius:24px; background:#f5f4f0; border:none;"></textarea></div>
+                <div style="display: flex; gap:12px; margin-bottom: 20px;"><input type="date" id="eventDateInput" style="flex:1; padding:12px; border-radius:40px; background:#f5f4f0;"><input type="time" id="eventTimeInput" style="flex:1; padding:12px; border-radius:40px; background:#f5f4f0;"></div>
+                <div style="display: flex; gap:12px;"><button class="btn-secondary" id="backStep2Btn">Atrás</button><button class="btn-primary" id="saveEventBtn">Guardar</button></div>
             </div>
         </div>
     </div>
-    
-    <!-- Panel de reportes -->
-    <div class="reports-panel" id="reportsPanel">
-        <div class="reports-header">
-            <span><i class="fas fa-list"></i> Mis reportes</span>
-            <button id="closeReportsBtn" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer;"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="reports-list" id="reportsListContainer">
-            <div style="text-align: center; padding: 30px; color: #999;">No hay reportes</div>
-        </div>
-    </div>
-    
-    <div class="loader-mini" id="loaderMini">
-        <div class="loader-spinner-mini"></div>
-        <div style="color: #5a6a7a; font-size: 13px;">Cargando mapa...</div>
-    </div>
-    
-    <div class="toast-mini" id="toastMsg"></div>
-    
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        // Configuración
-        const CHASCOMUS = [-35.5762, -58.0104];
-        const SHEETBEST_API = 'https://api.sheetbest.com/sheets/f541beca-e53f-4201-8d8f-feb75f92509b';
-        
-        let map, markersLayer;
-        let selectedLocation = null;
-        let selectedCategory = null;
-        let currentStep = 1;
-        let isSelectingLocation = false;
-        
-        // Reportes
-        let reports = JSON.parse(localStorage.getItem('seguridad_reports') || '[]');
-        let pendingReports = JSON.parse(localStorage.getItem('seguridad_pending') || '[]');
-        let isOnline = navigator.onLine;
-        
-        // Base path para Android
-        const isAndroid = /android/i.test(navigator.userAgent);
-        const basePath = isAndroid ? 'file:///android_asset/' : '';
-        
-        const categories = [
-            { id: 'robo', icon: 'fas fa-gem', label: 'Robo/Hurto' },
-            { id: 'sospechoso', icon: 'fas fa-user-secret', label: 'Persona sospechosa' },
-            { id: 'animales', icon: 'fas fa-cow', label: 'Animales/Ganado' },
-            { id: 'vandalismo', icon: 'fas fa-spray-can', label: 'Vandalismo' },
-            { id: 'accidente', icon: 'fas fa-car-crash', label: 'Accidente' },
-            { id: 'incendio', icon: 'fas fa-fire', label: 'Incendio' },
-            { id: 'otros', icon: 'fas fa-ellipsis-h', label: 'Otros' }
-        ];
-        
-        const categoryDetails = {
-            robo: ['Robo de campo', 'Robo de vehículo', 'Robo de herramientas', 'Hurto menor', 'Robo con violencia', 'Otro'],
-            sospechoso: ['Persona merodeando', 'Vehiculo sospechoso', 'Actividad nocturna', 'Ruidos extraños', 'Otro'],
-            animales: ['Animales sueltos', 'Ganado perdido', 'Ataque de animales', 'Animal muerto', 'Otro'],
-            vandalismo: ['Pintadas', 'Rotura de propiedad', 'Daño en alambrado', 'Incendio provocado', 'Otro'],
-            accidente: ['Choque', 'Vuelco', 'Atropello', 'Incidente con maquinaria', 'Otro'],
-            incendio: ['Incendio forestal', 'Incendio de pastizales', 'Incendio estructural', 'Quema no autorizada', 'Otro'],
-            otros: ['Problemas con vecinos', 'Servicios públicos', 'Caminos en mal estado', 'Inundación', 'Otro']
-        };
-        
-        // Actualizar coordenadas en el display
-        function updateCoordDisplay() {
-            const center = map.getCenter();
-            const display = document.getElementById('coordDisplay');
-            if (display) {
-                display.textContent = `${center.lat.toFixed(6)}, ${center.lng.toFixed(6)}`;
-            }
-        }
-        
-        // Inicializar mapa principal
-        function initMap() {
-            map = L.map('map', {
-                zoomControl: true,
-                zoomControl: false,
-                attributionControl: false
-            }).setView(CHASCOMUS, 12);
-            
-            L.control.zoom({
-                position: 'topright'
-            }).addTo(map);
-            
-            map.getContainer().style.backgroundColor = '#FFF3EB';
-            
-            markersLayer = L.layerGroup().addTo(map);
-            
-            const fondoDiv = document.createElement('div');
-            fondoDiv.style.position = 'absolute';
-            fondoDiv.style.top = '0';
-            fondoDiv.style.left = '0';
-            fondoDiv.style.width = '100%';
-            fondoDiv.style.height = '100%';
-            fondoDiv.style.backgroundColor = '#FFC199';
-            fondoDiv.style.zIndex = '-1';
-            map.getContainer().appendChild(fondoDiv);
-            
-            // Mapa base CyclOSM
-            const baseLayer = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 18 });
-            baseLayer.addTo(map);
-            
-            let baseVisible = true;
-            document.getElementById('mapToggleBtn').onclick = () => {
-                if (baseVisible) {
-                    map.removeLayer(baseLayer);
-                    baseVisible = false;
-                    document.getElementById('mapToggleBtn').innerHTML = '<i class="fas fa-palette"></i><span>Fondo</span>';
+</div>
+<div class="toast-mini" id="toastMsg"></div>
+<div class="loader-mini" id="loaderMini"><div style="background:#2c7a5e; width:32px; height:32px; border-radius:50%; animation: pulse 0.8s infinite;"></div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Configuración y estado
+    const CHASCOMUS = [-35.5762, -58.0104];
+    let map, markersLayer;
+    let selectedLocation = null, selectedCategory = null;
+    let currentStep = 1, isSelectingLocation = false;
+    let reports = JSON.parse(localStorage.getItem('seguridad_reports') || '[]');
+    let pendingReports = JSON.parse(localStorage.getItem('seguridad_pending') || '[]');
+    let isOnline = navigator.onLine;
+
+    const categories = [
+        { id: 'robo', icon: 'fas fa-gem', label: 'Robo/Hurto' },
+        { id: 'sospechoso', icon: 'fas fa-user-secret', label: 'Persona sospechosa' },
+        { id: 'animales', icon: 'fas fa-cow', label: 'Animales/Ganado' },
+        { id: 'vandalismo', icon: 'fas fa-spray-can', label: 'Vandalismo' },
+        { id: 'accidente', icon: 'fas fa-car-crash', label: 'Accidente' },
+        { id: 'incendio', icon: 'fas fa-fire', label: 'Incendio' }
+    ];
+    const categoryDetails = {
+        robo: ['Robo de campo', 'Robo vehículo', 'Herramientas'], sospechoso: ['Merodeando', 'Vehículo extraño', 'Actividad nocturna'],
+        animales: ['Animales sueltos', 'Ganado perdido', 'Ataque'], vandalismo: ['Daños alambrado', 'Rotura propiedad', 'Pintadas'],
+        accidente: ['Choque rural', 'Vuelco', 'Atropello'], incendio: ['Pastizales', 'Forestal', 'Quema no autorizada']
+    };
+
+    function showToast(msg, err = false) { let t = document.getElementById('toastMsg'); t.textContent = msg; t.style.background = err ? '#b13e2e' : '#1f3e37'; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2200); }
+
+    // Guardar reporte
+    function saveReport(categoryLabel, details, description, date, time, location) {
+        const newReport = { id: Date.now(), category: categoryLabel, details, description, date, time, location: { lat: location.lat, lng: location.lng }, timestamp: new Date().toISOString(), synced: false };
+        reports.unshift(newReport);
+        addMarkerToMap(newReport);
+        localStorage.setItem('seguridad_reports', JSON.stringify(reports));
+        if (isOnline) {
+            fetch('https://api.sheetbest.com/sheets/f541beca-e53f-4201-8d8f-feb75f92509b', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newReport) })
+                .then(res => { if(res.ok) { newReport.synced = true; let idx = reports.findIndex(r=>r.id===newReport.id); if(idx!==-1) reports[idx].synced=true; localStorage.setItem('seguridad_reports', JSON.stringify(reports)); showToast('Reporte enviado'); } else { pendingReports.push(newReport); localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports)); showToast('Guardado local'); } updateReportsList(); })
+                .catch(() => { pendingReports.push(newReport); localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports)); updateReportsList(); showToast('Modo offline, guardado local'); });
+        } else { pendingReports.push(newReport); localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports)); updateReportsList(); showToast('Guardado local (sin conexión)'); }
+        updateReportsList();
+    }
+
+    function addMarkerToMap(report) {
+        const colorMap = { 'Robo/Hurto':'#e05a4f','Persona sospechosa':'#e6a157','Animales/Ganado':'#5b8c6f','Vandalismo':'#8f6e9e','Accidente':'#4f8bc9','Incendio':'#d97746' };
+        let col = colorMap[report.category] || '#6c8b7e';
+        let marker = L.marker([report.location.lat, report.location.lng], { icon: L.divIcon({ html: `<div style="background:${col};width:28px;height:28px;border-radius:50%;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;">${report.synced ? '✓' : '⌛'}</div>`, iconSize: [28,28], iconAnchor: [14,14] }) }).addTo(markersLayer);
+        marker.bindPopup(`<b>${report.category}</b><br>${report.description}<br><small>${report.date} ${report.time}</small>`);
+    }
+
+    // Render panel con expansión minimalista y orden por fecha más reciente (ya está en reports ordenados por timestamp descendente)
+    function updateReportsList() {
+        const container = document.getElementById('reportsListContainer');
+        if (!reports.length) { container.innerHTML = '<div style="text-align:center;padding:40px;color:#a3b7af;">✨ No hay incidentes registrados</div>'; return; }
+        // Orden descendente por timestamp (más reciente primero)
+        let sorted = [...reports].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
+        container.innerHTML = '';
+        sorted.forEach(r => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'report-item';
+            itemDiv.dataset.id = r.id;
+            itemDiv.innerHTML = `
+                <div class="report-header">
+                    <div class="report-badge"><span class="report-cat">${r.category}</span><span class="report-date"><i class="far fa-calendar-alt"></i> ${r.date} ${r.time}</span></div>
+                    <div class="expand-icon"><i class="fas fa-chevron-down"></i></div>
+                </div>
+                <div style="padding:0 18px 12px 18px;"><div class="report-desc-preview">${r.description.substring(0, 70)}${r.description.length>70?'…':''}</div></div>
+                <div class="report-detail">
+                    <div class="detail-row"><i class="fas fa-tag"></i><span class="detail-label">Tipo:</span><span class="detail-text">${r.details || 'No especificado'}</span></div>
+                    <div class="detail-row"><i class="fas fa-pen-alt"></i><span class="detail-label">Detalle:</span><span class="detail-text">${r.description}</span></div>
+                    <div class="detail-row"><i class="fas fa-map-marker-alt"></i><span class="detail-label">Ubicación:</span><span class="detail-text report-location">${r.location.lat.toFixed(5)}, ${r.location.lng.toFixed(5)}</span></div>
+                    <div class="detail-row"><i class="fas fa-cloud"></i><span class="detail-label">Estado:</span><span class="detail-text">${r.synced ? 'Sincronizado ✓' : 'Pendiente ⏳'}</span></div>
+                </div>
+            `;
+            const header = itemDiv.querySelector('.report-header');
+            const detailDiv = itemDiv.querySelector('.report-detail');
+            const icon = header.querySelector('.expand-icon i');
+            header.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = detailDiv.classList.contains('show');
+                document.querySelectorAll('.report-detail').forEach(d => { if(d !== detailDiv) d.classList.remove('show'); });
+                document.querySelectorAll('.expand-icon i').forEach(ic => ic.className = 'fas fa-chevron-down');
+                if(!isOpen) {
+                    detailDiv.classList.add('show');
+                    icon.className = 'fas fa-chevron-up';
                 } else {
-                    baseLayer.addTo(map);
-                    baseVisible = true;
-                    document.getElementById('mapToggleBtn').innerHTML = '<i class="fas fa-map"></i><span>Mapa base</span>';
-                }
-            };
-            
-            map.on('zoomend', () => {
-                document.getElementById('zoomBadge').innerHTML = `🔍 ${map.getZoom()}`;
-                if (isSelectingLocation) {
-                    updateCoordDisplay();
+                    detailDiv.classList.remove('show');
+                    icon.className = 'fas fa-chevron-down';
                 }
             });
-            
-            map.on('moveend', () => {
-                if (isSelectingLocation) {
-                    updateCoordDisplay();
-                    // Efecto de pulso en el pin
-                    const pin = document.getElementById('centerPin');
-                    pin.classList.add('pulse');
-                    setTimeout(() => pin.classList.remove('pulse'), 300);
-                }
-            });
-            
-            // Cargar capas GeoJSON
-            let loadedLayers = 0;
-            const totalLayers = 6;
-            const updateLayerCounter = () => {
-                loadedLayers++;
-                document.getElementById('layersBadge').innerHTML = `📂 ${loadedLayers}/${totalLayers}`;
-            };
-            
-            fetch(basePath + 'limites.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { style: { color: '#27ae60', weight: 3, fillOpacity: 0 } }).bindPopup(f => f.properties?.nombre || 'Límite').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-            
-            fetch(basePath + 'arroyos-rios.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { style: { color: '#3498db', weight: 2.5 } }).bindPopup(f => f.properties?.nombre || 'Arroyo/Río').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-            
-            fetch(basePath + 'natural.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { style: { color: '#2E26FF', weight: 1.5, fillColor: '#2E26FF', fillOpacity: 0.5 } }).bindPopup(f => f.properties?.nombre || 'Área natural').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-            
-            fetch(basePath + 'wetland.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { 
-                    style: { 
-                        color: '#90EE90',
-                        weight: 1.5, 
-                        fillColor: '#90EE90',
-                        fillOpacity: 0.6,
-                        opacity: 0.8
-                    } 
-                }).bindPopup(f => f.properties?.nombre || f.properties?.name || 'Humedal/Arboleda').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-            
-            fetch(basePath + 'roads.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { style: { color: '#4A4848', weight: 1.2 } }).bindPopup(f => f.properties?.name || f.properties?.nombre || 'Camino').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-            
-            fetch(basePath + 'railways.geojson').then(r => r.json()).then(data => {
-                L.geoJSON(data, { style: { color: '#9b59b6', weight: 2, dashArray: '6,4' } }).bindPopup(f => f.properties?.nombre || 'Ferrocarril').addTo(map);
-                updateLayerCounter();
-            }).catch(() => updateLayerCounter());
-        }
-        
-        function showToast(text, isError = false) {
-            const toast = document.getElementById('toastMsg');
-            toast.textContent = text;
-            toast.style.background = isError ? '#e74c3c' : '#2c3e50';
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 2500);
-        }
-        
-        function updateConnectionStatus() {
-            const badge = document.getElementById('connectionBadge');
-            if (isOnline) {
-                badge.className = 'connection-badge online';
-                badge.innerHTML = '<i class="fas fa-wifi"></i> Online';
-            } else {
-                badge.className = 'connection-badge offline';
-                badge.innerHTML = '<i class="fas fa-signal-slash"></i> Offline';
-            }
-        }
-        
-        async function syncPending() {
-            if (!isOnline || pendingReports.length === 0) return;
-            for (let i = 0; i < pendingReports.length; i++) {
-                const r = pendingReports[i];
-                try {
-                    const res = await fetch(SHEETBEST_API, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(r)
-                    });
-                    if (res.ok) {
-                        const idx = reports.findIndex(rep => rep.id === r.id);
-                        if (idx !== -1) reports[idx].synced = true;
-                        pendingReports.splice(i, 1);
-                        i--;
-                    }
-                } catch(e) {}
-            }
-            localStorage.setItem('seguridad_reports', JSON.stringify(reports));
-            localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports));
-            updateReportsList();
-        }
-        
-        function addMarkerToMap(report) {
-            const colors = { 'Robo/Hurto':'#e74c3c', 'Persona sospechosa':'#f39c12', 'Animales/Ganado':'#27ae60', 'Vandalismo':'#8e44ad', 'Accidente':'#3498db', 'Incendio':'#d35400', 'Otros':'#7f8c8d' };
-            const color = colors[report.category] || '#2c3e50';
-            const marker = L.marker([report.location.lat, report.location.lng], {
-                icon: L.divIcon({ 
-                    html: `<div style="background:${color};width:26px;height:26px;border-radius:50%;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:bold;">${report.synced ? '✓' : '⏳'}</div>`,
-                    iconSize: [26, 26],
-                    iconAnchor: [13, 13]
-                })
-            }).addTo(markersLayer);
-            marker.bindPopup(`<b>${report.category}</b><br>${report.description}<br><small>${report.date} ${report.time}</small>`);
-            marker.reportId = report.id;
-        }
-        
-        function updateReportsList() {
-            const container = document.getElementById('reportsListContainer');
-            if (!reports.length) {
-                container.innerHTML = '<div style="text-align:center;padding:30px;color:#999;">No hay reportes</div>';
-                return;
-            }
-            let html = '';
-            reports.slice(0, 15).forEach(r => {
-                html += `<div class="report-item" data-id="${r.id}">
-                    <div class="report-cat">${r.category}</div>
-                    <div class="report-desc">${r.description.substring(0, 60)}</div>
-                    <div class="report-date">${r.date} ${r.time} ${r.synced ? '✓' : '⏳'}</div>
-                </div>`;
-            });
-            container.innerHTML = html;
-            document.querySelectorAll('.report-item').forEach(el => {
-                el.onclick = () => {
-                    const id = parseInt(el.dataset.id);
-                    const rep = reports.find(r => r.id === id);
-                    if (rep) map.setView([rep.location.lat, rep.location.lng], 15);
-                    document.getElementById('reportsPanel').style.display = 'none';
-                };
-            });
-        }
-        
-        function saveReport(categoryLabel, details, description, date, time, location) {
-            const newReport = {
-                id: Date.now(),
-                category: categoryLabel,
-                details: details,
-                description: description,
-                date: date,
-                time: time,
-                location: { lat: location.lat, lng: location.lng },
-                timestamp: new Date().toISOString(),
-                synced: false
-            };
-            reports.unshift(newReport);
-            addMarkerToMap(newReport);
-            
-            localStorage.setItem('seguridad_reports', JSON.stringify(reports));
-            
-            if (isOnline) {
-                fetch(SHEETBEST_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newReport)
-                }).then(res => {
-                    if (res.ok) {
-                        newReport.synced = true;
-                        const idx = reports.findIndex(r => r.id === newReport.id);
-                        if (idx !== -1) reports[idx].synced = true;
-                        localStorage.setItem('seguridad_reports', JSON.stringify(reports));
-                        showToast('Reporte enviado');
-                    } else {
-                        pendingReports.push(newReport);
-                        localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports));
-                        showToast('Guardado local', false);
-                    }
-                    updateReportsList();
-                }).catch(() => {
-                    pendingReports.push(newReport);
-                    localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports));
-                    updateReportsList();
-                    showToast('Guardado localmente', false);
-                });
-            } else {
-                pendingReports.push(newReport);
-                localStorage.setItem('seguridad_pending', JSON.stringify(pendingReports));
-                updateReportsList();
-                showToast('Guardado local', false);
-            }
-        }
-        
-        // Activar modo selección de ubicación
-        function startLocationSelection() {
-            isSelectingLocation = true;
-            
-            // Mostrar elementos de selección
-            document.getElementById('centerPin').style.display = 'block';
-            document.getElementById('pinInstruction').style.display = 'block';
-            document.getElementById('coordPanel').style.display = 'block';
-            document.getElementById('confirmSelectionBtn').style.display = 'block';
-            document.getElementById('cancelSelectionBtn').style.display = 'flex';
-            
-            document.getElementById('eventModal').style.display = 'none';
-            
-            // Ocultar UI que puede molestar
-            document.querySelector('.fab-event').style.display = 'none';
-            document.querySelector('.fab-reports').style.display = 'none';
-            document.querySelector('.map-toggle').style.display = 'none';
-            document.querySelector('.zoom-badge').style.display = 'none';
-            
-            updateCoordDisplay();
-            
-            // Si hay ubicación previa, centrar ahí
-            if (selectedLocation) {
-                map.setView(selectedLocation, 15);
-            } else {
-                // Centrar en Chascomús con zoom adecuado
-                map.setView(CHASCOMUS, 14);
-            }
-            
-            map.invalidateSize();
-        }
-        
-        function stopLocationSelection() {
-            isSelectingLocation = false;
-            
-            // Ocultar elementos de selección
-            document.getElementById('centerPin').style.display = 'none';
-            document.getElementById('pinInstruction').style.display = 'none';
-            document.getElementById('coordPanel').style.display = 'none';
-            document.getElementById('confirmSelectionBtn').style.display = 'none';
-            document.getElementById('cancelSelectionBtn').style.display = 'none';
-            
-            // Mostrar UI nuevamente
-            document.querySelector('.fab-event').style.display = 'flex';
-            document.querySelector('.fab-reports').style.display = 'flex';
-            document.querySelector('.map-toggle').style.display = 'flex';
-            document.querySelector('.zoom-badge').style.display = 'block';
-        }
-        
-        // UI Eventos
-        document.getElementById('newEventBtn').onclick = () => {
-            document.getElementById('eventModal').style.display = 'flex';
-            currentStep = 1;
-            document.getElementById('step1Container').style.display = 'block';
-            document.getElementById('step2Container').style.display = 'none';
-            document.getElementById('step3Container').style.display = 'none';
-            document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 0));
-            selectedLocation = null;
-            selectedCategory = null;
-            document.getElementById('locationSelectedBox').style.display = 'none';
-            document.getElementById('locationSelectBox').style.display = 'block';
-        };
-        
-        document.getElementById('closeModalBtn').onclick = () => document.getElementById('eventModal').style.display = 'none';
-        document.getElementById('cancelEventBtn').onclick = () => document.getElementById('eventModal').style.display = 'none';
-        document.getElementById('cancelEventBtn2').onclick = () => document.getElementById('eventModal').style.display = 'none';
-        
-        document.getElementById('useGpsBtn').onclick = () => {
-            if (!navigator.geolocation) { 
-                showToast('GPS no soportado', true); 
-                return; 
-            }
-            showToast('Obteniendo ubicación...');
-            navigator.geolocation.getCurrentPosition(
-                pos => {
-                    selectedLocation = L.latLng(pos.coords.latitude, pos.coords.longitude);
-                    document.getElementById('selectedCoordsText').innerHTML = `${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`;
-                    document.getElementById('locationSelectedBox').style.display = 'block';
-                    document.getElementById('locationSelectBox').style.display = 'none';
-                    showToast('Ubicación obtenida');
-                },
-                () => showToast('Error de GPS', true),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        };
-        
-        document.getElementById('selectOnMapBtn').onclick = () => {
-            startLocationSelection();
-        };
-        
-        document.getElementById('confirmSelectionBtn').onclick = () => {
-            selectedLocation = map.getCenter();
-            document.getElementById('selectedCoordsText').innerHTML = `${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`;
-            stopLocationSelection();
-            document.getElementById('eventModal').style.display = 'flex';
-            document.getElementById('locationSelectedBox').style.display = 'block';
-            document.getElementById('locationSelectBox').style.display = 'none';
-            showToast('Ubicación seleccionada');
-        };
-        
-        document.getElementById('cancelSelectionBtn').onclick = () => {
-            stopLocationSelection();
-            document.getElementById('eventModal').style.display = 'flex';
-        };
-        
-        document.getElementById('changeLocationBtn').onclick = () => {
-            selectedLocation = null;
-            document.getElementById('locationSelectedBox').style.display = 'none';
-            document.getElementById('locationSelectBox').style.display = 'block';
-        };
-        
-        document.getElementById('nextStep1Btn').onclick = () => {
-            if (!selectedLocation) { showToast('Seleccioná una ubicación', true); return; }
-            currentStep = 2;
-            document.getElementById('step1Container').style.display = 'none';
-            document.getElementById('step2Container').style.display = 'block';
-            document.getElementById('step3Container').style.display = 'none';
-            document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 1));
-        };
-        
-        const categoriesGrid = document.getElementById('categoriesGrid');
-        categories.forEach(cat => {
-            const div = document.createElement('div');
-            div.className = 'cat-card';
-            div.dataset.id = cat.id;
-            div.dataset.label = cat.label;
-            div.innerHTML = `<i class="${cat.icon}"></i><span>${cat.label}</span>`;
-            div.onclick = () => {
-                document.querySelectorAll('.cat-card').forEach(c => c.classList.remove('active'));
-                div.classList.add('active');
-                selectedCategory = { id: cat.id, label: cat.label };
-                document.getElementById('nextStep2Btn').disabled = false;
-            };
-            categoriesGrid.appendChild(div);
+            itemDiv.addEventListener('click', (e) => { if(!e.target.closest('.report-header')) return; });
+            container.appendChild(itemDiv);
         });
-        
-        document.getElementById('nextStep2Btn').onclick = () => {
-            if (!selectedCategory) { showToast('Elegí una categoría', true); return; }
-            currentStep = 3;
-            document.getElementById('step1Container').style.display = 'none';
-            document.getElementById('step2Container').style.display = 'none';
-            document.getElementById('step3Container').style.display = 'block';
-            document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 2));
-            
-            const detailSelect = document.getElementById('detailSelect');
-            detailSelect.innerHTML = '<option value="">Seleccionar tipo</option>';
-            categoryDetails[selectedCategory.id].forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d;
-                opt.textContent = d;
-                detailSelect.appendChild(opt);
-            });
-        };
-        
-        document.getElementById('backStep1Btn').onclick = () => {
-            currentStep = 1;
-            document.getElementById('step1Container').style.display = 'block';
-            document.getElementById('step2Container').style.display = 'none';
-            document.getElementById('step3Container').style.display = 'none';
-            document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 0));
-        };
-        
-        document.getElementById('backStep2Btn').onclick = () => {
-            currentStep = 2;
-            document.getElementById('step1Container').style.display = 'none';
-            document.getElementById('step2Container').style.display = 'block';
-            document.getElementById('step3Container').style.display = 'none';
-            document.querySelectorAll('.step').forEach((s, i) => s.classList.toggle('active', i === 1));
-        };
-        
-        document.getElementById('saveEventBtn').onclick = () => {
-            const details = document.getElementById('detailSelect').value;
-            if (!details) { showToast('Seleccioná tipo específico', true); return; }
-            const description = document.getElementById('descriptionInput').value.trim() || 'Sin descripción';
-            const date = document.getElementById('eventDateInput').value;
-            const time = document.getElementById('eventTimeInput').value;
-            if (!date || !time) { showToast('Completá fecha y hora', true); return; }
-            saveReport(selectedCategory.label, details, description, date, time, selectedLocation);
-            document.getElementById('eventModal').style.display = 'none';
-            document.getElementById('descriptionInput').value = '';
-            document.getElementById('eventDateInput').value = new Date().toISOString().split('T')[0];
-            document.getElementById('eventTimeInput').value = new Date().toTimeString().slice(0,5);
-            selectedLocation = null;
-            selectedCategory = null;
-            document.getElementById('locationSelectedBox').style.display = 'none';
-            document.getElementById('locationSelectBox').style.display = 'block';
-            document.querySelectorAll('.cat-card').forEach(c => c.classList.remove('active'));
-            document.getElementById('nextStep2Btn').disabled = true;
-        };
-        
-        document.getElementById('reportsBtn').onclick = () => {
-            updateReportsList();
-            document.getElementById('reportsPanel').style.display = 'block';
-        };
-        document.getElementById('closeReportsBtn').onclick = () => document.getElementById('reportsPanel').style.display = 'none';
-        
-        window.addEventListener('online', () => { 
-            isOnline = true; 
-            updateConnectionStatus(); 
-            syncPending(); 
-            showToast('Conexión recuperada'); 
-        });
-        
-        window.addEventListener('offline', () => { 
-            isOnline = false; 
-            updateConnectionStatus(); 
-            showToast('Sin conexión', true); 
-        });
-        
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('eventDateInput').value = new Date().toISOString().split('T')[0];
-            document.getElementById('eventTimeInput').value = new Date().toTimeString().slice(0,5);
-            initMap();
-            reports.forEach(r => addMarkerToMap(r));
-            updateReportsList();
-            updateConnectionStatus();
-            setTimeout(() => {
-                document.getElementById('loaderMini').style.display = 'none';
-                if (pendingReports.length > 0 && isOnline) syncPending();
-            }, 1200);
-        });
-    </script>
+    }
+
+    function initMap() {
+        map = L.map('map').setView(CHASCOMUS, 12);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+        markersLayer = L.layerGroup().addTo(map);
+        const baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '', maxZoom: 18 });
+        baseLayer.addTo(map);
+        let baseVisible = true;
+        document.getElementById('mapToggleBtn').onclick = () => { if(baseVisible) { map.removeLayer(baseLayer); baseVisible=false; document.getElementById('mapToggleBtn').innerHTML='<i class="fas fa-palette"></i><span>Satélite</span>'; } else { baseLayer.addTo(map); baseVisible=true; document.getElementById('mapToggleBtn').innerHTML='<i class="fas fa-map"></i><span>Mapa base</span>'; } };
+        map.on('zoomend', () => document.getElementById('zoomBadge').innerHTML = `🔍 ${map.getZoom()}`);
+        map.on('moveend', () => { if(isSelectingLocation) document.getElementById('coordDisplay').innerText = `${map.getCenter().lat.toFixed(6)}, ${map.getCenter().lng.toFixed(6)}`; });
+        // Capas simplificadas: quitamos la sobrecarga visual (solo una capa demostrativa, se cumple quitar capas cargadas)
+        // Solo mantenemos una capa de límite liviana (opcional)
+        fetch('limites.geojson').catch(()=>{});
+        reports.forEach(r => addMarkerToMap(r));
+        setTimeout(() => { document.getElementById('loaderMini').style.display = 'none'; if(pendingReports.length && isOnline) syncPending(); }, 800);
+    }
+    async function syncPending() { if(!isOnline) return; for(let i=0;i<pendingReports.length;i++) { try { let res = await fetch('https://api.sheetbest.com/sheets/f541beca-e53f-4201-8d8f-feb75f92509b', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(pendingReports[i]) }); if(res.ok) { let idx = reports.findIndex(r=>r.id===pendingReports[i].id); if(idx!==-1) reports[idx].synced=true; pendingReports.splice(i,1); i--; } } catch(e){} } localStorage.setItem('seguridad_reports',JSON.stringify(reports)); localStorage.setItem('seguridad_pending',JSON.stringify(pendingReports)); updateReportsList(); }
+
+    // Ubicación en mapa
+    function startLocationSelection() { isSelectingLocation=true; document.getElementById('centerPin').style.display='block'; document.getElementById('pinInstruction').style.display='block'; document.getElementById('coordPanel').style.display='block'; document.getElementById('confirmSelectionBtn').style.display='block'; document.getElementById('cancelSelectionBtn').style.display='flex'; document.querySelector('.fab-event').style.display='none'; document.querySelector('.fab-reports').style.display='none'; document.querySelector('.map-toggle').style.display='none'; document.getElementById('zoomBadge').style.display='none'; if(selectedLocation) map.setView(selectedLocation,15); else map.setView(CHASCOMUS,13); updateCoordDisplay(); }
+    function stopLocationSelection() { isSelectingLocation=false; document.getElementById('centerPin').style.display='none'; document.getElementById('pinInstruction').style.display='none'; document.getElementById('coordPanel').style.display='none'; document.getElementById('confirmSelectionBtn').style.display='none'; document.getElementById('cancelSelectionBtn').style.display='none'; document.querySelector('.fab-event').style.display='flex'; document.querySelector('.fab-reports').style.display='flex'; document.querySelector('.map-toggle').style.display='flex'; document.getElementById('zoomBadge').style.display='block'; }
+    function updateCoordDisplay() { let c = map.getCenter(); document.getElementById('coordDisplay').innerText = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`; }
+
+    // Eventos UI
+    document.getElementById('newEventBtn').onclick = () => { document.getElementById('eventModal').style.display='flex'; currentStep=1; document.getElementById('step1Container').style.display='block'; document.getElementById('step2Container').style.display='none'; document.getElementById('step3Container').style.display='none'; document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('active',i===0)); selectedLocation=null; document.getElementById('locationSelectedBox').style.display='none'; document.getElementById('locationSelectBox').style.display='block'; };
+    document.getElementById('closeModalBtn').onclick = () => document.getElementById('eventModal').style.display='none';
+    document.getElementById('cancelEventBtn').onclick = () => document.getElementById('eventModal').style.display='none';
+    document.getElementById('cancelEventBtn2').onclick = () => document.getElementById('eventModal').style.display='none';
+    document.getElementById('useGpsBtn').onclick = () => { if(navigator.geolocation) { showToast('Obteniendo GPS...'); navigator.geolocation.getCurrentPosition(p=>{ selectedLocation = L.latLng(p.coords.latitude, p.coords.longitude); document.getElementById('selectedCoordsText').innerHTML=`${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`; document.getElementById('locationSelectedBox').style.display='block'; document.getElementById('locationSelectBox').style.display='none'; },()=>showToast('Error GPS',true)); } else showToast('No soportado',true); };
+    document.getElementById('selectOnMapBtn').onclick = () => { startLocationSelection(); };
+    document.getElementById('confirmSelectionBtn').onclick = () => { selectedLocation = map.getCenter(); document.getElementById('selectedCoordsText').innerHTML=`${selectedLocation.lat.toFixed(5)}, ${selectedLocation.lng.toFixed(5)}`; stopLocationSelection(); document.getElementById('eventModal').style.display='flex'; document.getElementById('locationSelectedBox').style.display='block'; document.getElementById('locationSelectBox').style.display='none'; };
+    document.getElementById('cancelSelectionBtn').onclick = () => { stopLocationSelection(); document.getElementById('eventModal').style.display='flex'; };
+    document.getElementById('changeLocationBtn').onclick = () => { selectedLocation=null; document.getElementById('locationSelectedBox').style.display='none'; document.getElementById('locationSelectBox').style.display='block'; };
+    document.getElementById('nextStep1Btn').onclick = () => { if(!selectedLocation){ showToast('Selecciona ubicación',true); return; } currentStep=2; document.getElementById('step1Container').style.display='none'; document.getElementById('step2Container').style.display='block'; document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('active',i===1)); };
+    const grid = document.getElementById('categoriesGrid'); categories.forEach(c=>{ let div=document.createElement('div'); div.className='cat-card'; div.innerHTML=`<i class="${c.icon}"></i><div style="margin-top:6px;">${c.label}</div>`; div.onclick=()=>{ document.querySelectorAll('.cat-card').forEach(c=>c.classList.remove('active')); div.classList.add('active'); selectedCategory={id:c.id,label:c.label}; document.getElementById('nextStep2Btn').disabled=false; }; grid.appendChild(div); });
+    document.getElementById('nextStep2Btn').onclick = () => { if(!selectedCategory){ showToast('Elige categoría',true); return; } currentStep=3; document.getElementById('step2Container').style.display='none'; document.getElementById('step3Container').style.display='block'; document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('active',i===2)); let sel = document.getElementById('detailSelect'); sel.innerHTML=''; (categoryDetails[selectedCategory.id]||['Otro']).forEach(d=>{ let opt=document.createElement('option'); opt.value=d; opt.innerText=d; sel.appendChild(opt); }); };
+    document.getElementById('backStep1Btn').onclick = () => { currentStep=1; document.getElementById('step1Container').style.display='block'; document.getElementById('step2Container').style.display='none'; document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('active',i===0)); };
+    document.getElementById('backStep2Btn').onclick = () => { currentStep=2; document.getElementById('step2Container').style.display='block'; document.getElementById('step3Container').style.display='none'; document.querySelectorAll('.step').forEach((s,i)=>s.classList.toggle('active',i===1)); };
+    document.getElementById('saveEventBtn').onclick = () => { let details = document.getElementById('detailSelect').value; if(!details) { showToast('Tipo requerido',true); return; } let desc = document.getElementById('descriptionInput').value.trim()||'Sin detalles'; let date = document.getElementById('eventDateInput').value; let time = document.getElementById('eventTimeInput').value; if(!date||!time){ showToast('Fecha y hora obligatorias',true); return; } saveReport(selectedCategory.label, details, desc, date, time, selectedLocation); document.getElementById('eventModal').style.display='none'; document.getElementById('descriptionInput').value=''; document.getElementById('eventDateInput').value=new Date().toISOString().split('T')[0]; document.getElementById('eventTimeInput').value=new Date().toTimeString().slice(0,5); selectedLocation=null; selectedCategory=null; document.getElementById('locationSelectedBox').style.display='none'; document.getElementById('locationSelectBox').style.display='block'; document.getElementById('nextStep2Btn').disabled=true; };
+    document.getElementById('reportsBtn').onclick = () => { updateReportsList(); document.getElementById('reportsPanel').style.display='flex'; };
+    document.getElementById('closeReportsBtn').onclick = () => document.getElementById('reportsPanel').style.display='none';
+    window.addEventListener('online',()=>{ isOnline=true; syncPending(); showToast('Conectado'); });
+    window.addEventListener('offline',()=>{ isOnline=false; showToast('Sin conexión',true); });
+    document.addEventListener('DOMContentLoaded',()=>{ document.getElementById('eventDateInput').value=new Date().toISOString().split('T')[0]; document.getElementById('eventTimeInput').value=new Date().toTimeString().slice(0,5); initMap(); updateReportsList(); });
+</script>
 </body>
 </html>
